@@ -12,9 +12,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.lang.reflect.GenericDeclaration;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
@@ -174,35 +172,40 @@ class EndpointImplementation implements Endpoint, EndpointClassic {
 
     @SuppressWarnings("unchecked")
     public <T> AsyncResult sendAsyncRequest(String url, String name, CallbackInterface<T> callback, Object... args) {
-        return sendAsyncRequest(url, name, new RequestOptions(), callback, args);
+        return sendAsyncRequest(url, name, new RequestMethodOption(), callback, args);
     }
 
     @SuppressWarnings("unchecked")
-    public <T> AsyncResult sendAsyncRequest(String url, String name, RequestOptions requestOptions, CallbackInterface<T> callback, Object... args) {
+    public <T> AsyncResult sendAsyncRequest(String url, String name, RequestMethodOption requestMethodOption, CallbackInterface<T> callback, Object... args) {
+
+    }
+
+    @Override
+    public <T> T sendRequest(String url, RequestMethodOption requestMethodOption, Type returnType, Object... args) throws JudoException {
+        Request request = new Request(++id, this, null, name, requestMethodOption, args,
+                returnType,
+                getRequestConnector().getMethodTimeout(),
+                null, getProtocolController().getAdditionalRequestData());
+        request.setCustomUrl(url);
+        request.setApiKeyRequired(requestMethodOption.apiKeyRequired());
+        return (T) getRequestConnector().call(request);
+    }
+
+    @Override
+    public <T> AsyncResult sendAsyncRequest(String url, RequestMethodOption requestMethodOption, CallbackInterface<T> callback, Object... args) {
         Request request = new Request(
                 ++id, this, null,
-                name, requestOptions, args,
+                name, requestMethodOption, args,
                 ((ParameterizedType)callback.getClass().getGenericSuperclass()).getActualTypeArguments()[0], getRequestConnector().getMethodTimeout(),
                 (CallbackInterface<Object>) callback, getProtocolController().getAdditionalRequestData());
         request.setCustomUrl(url);
-        request.setApiKeyRequired(requestOptions.apiKeyRequired());
+        request.setApiKeyRequired(requestMethodOption.apiKeyRequired());
         try {
             getExecutorService().execute(request);
         } catch (RejectedExecutionException ex) {
             new AsyncResultSender(request, new JudoException("Request queue is full.", ex)).run();
         }
         return request;
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T sendRequest(String url, String name, Type returnType, RequestOptions requestOptions, Object... args) throws JudoException{
-        Request request = new Request(++id, this, null, name, requestOptions, args,
-                returnType,
-                getRequestConnector().getMethodTimeout(),
-                null, getProtocolController().getAdditionalRequestData());
-        request.setCustomUrl(url);
-        request.setApiKeyRequired(requestOptions.apiKeyRequired());
-        return (T) getRequestConnector().call(request);
     }
 
         @Override
@@ -506,4 +509,6 @@ class EndpointImplementation implements Endpoint, EndpointClassic {
     public void setThreadPriority(int threadPriority) {
         this.threadPriority = threadPriority;
     }
+
+
 }
